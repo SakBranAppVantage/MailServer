@@ -1,7 +1,7 @@
 import express from "express";
 import * as smtpServer from "smtp-server";
 import * as mailparser from "mailparser";
-import { MongoClient, Db, Collection } from "mongodb";
+import { MongoClient, Db, Collection, ObjectId } from "mongodb";
 import AWS from "aws-sdk";
 const app = express();
 const port = 3000;
@@ -77,6 +77,15 @@ const server = new smtpServer.SMTPServer({
 
       // Save attachments to S3 and associate them with the email in MongoDB
       const attachmentsData = await saveAttachmentsToS3(attachments, emailId);
+      // Update the email record in MongoDB with the attachment URLs
+      await db.collection(COLLECTION_NAME).updateOne(
+        { _id: new ObjectId(emailId) },
+        {
+          $set: { attachments: attachmentsData.map((data) => data.Location) },
+        }
+      );
+      client.close();
+      callback();
       console.log(attachmentsData);
     };
     data();
