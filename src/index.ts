@@ -2,6 +2,7 @@ import express from "express";
 import * as smtpServer from "smtp-server";
 import * as mailparser from "mailparser";
 import { MongoClient, Db, Collection } from "mongodb";
+import AWS from "aws-sdk";
 const app = express();
 const port = 3000;
 
@@ -18,6 +19,36 @@ async function storeEmailInMongoDB(
   const collection: Collection = db.collection(COLLECTION_NAME);
   const result = await collection.insertOne({ email, attachments });
   return result.insertedId.toString();
+}
+
+// Set up AWS S3 client
+// AWS S3 configuration
+const AWS_ACCESS_KEY = "AKIAWMUVNR337UZOA4AI";
+const AWS_SECRET_ACCESS_KEY = "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";
+const S3_BUCKET_NAME = "super-bucket-appvantage";
+
+AWS.config.update({
+  accessKeyId: AWS_ACCESS_KEY,
+  secretAccessKey: AWS_SECRET_ACCESS_KEY,
+});
+
+const s3 = new AWS.S3();
+// Function to save email attachments to S3
+async function saveAttachmentsToS3(
+  attachments: mailparser.Attachment[],
+  emailId: string
+): Promise<AWS.S3.ManagedUpload.SendData[]> {
+  const promises = attachments.map(async (attachment, index) => {
+    const params: AWS.S3.PutObjectRequest = {
+      Bucket: S3_BUCKET_NAME,
+      Key: `${emailId}_${index}_${attachment.filename}`,
+      Body: attachment.content, // Use attachment content as Buffer
+    };
+
+    return s3.upload(params).promise();
+  });
+
+  return Promise.all(promises);
 }
 
 const server = new smtpServer.SMTPServer({
@@ -43,6 +74,10 @@ const server = new smtpServer.SMTPServer({
       const attachments = email.attachments || [];
       // Store the email in MongoDB
       const emailId = await storeEmailInMongoDB(db, email, attachments);
+
+      // Save attachments to S3 and associate them with the email in MongoDB
+      const attachmentsData = await saveAttachmentsToS3(attachments, emailId);
+      console.log(attachmentsData);
     };
     data();
 

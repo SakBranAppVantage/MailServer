@@ -1,6 +1,8 @@
 // emailSender.ts
 import nodemailer from "nodemailer";
+import * as path from "path";
 
+const fs = require("fs");
 async function sendEmail() {
   const transporter = nodemailer.createTransport({
     host: "127.0.0.1",
@@ -16,11 +18,21 @@ async function sendEmail() {
     },
   });
 
+  const attachmentPath = path.join(__dirname, "image.jpg");
+
+  const attachmentData = fs.readFileSync(attachmentPath);
+  console.log(attachmentPath);
   const mailOptions = {
     from: "sender@example.com",
     to: "recipient@example.com",
     subject: "Hello from Nodemailer!",
     text: "This is a test email sent using Nodemailer and SMTP server.",
+    attachments: [
+      {
+        filename: "image.jpg", // Change the name to your desired attachment name
+        content: attachmentData,
+      },
+    ],
   };
 
   try {
